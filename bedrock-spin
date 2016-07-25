@@ -1,0 +1,92 @@
+
+setup_bedrock() {
+
+  echo -e "Please enter the full path to the new site, e.g. /var/www/html/newproject:"
+  read WP_DIR
+
+  # basename of the $DIR - used as the destination directory, under `/var/www/html`
+  SITE_NAME=$(basename $WP_DIR)
+
+  # Create new directory and use WP-CLI to download WordPress
+  composer create-project roots/bedrock $WP_DIR
+  sudo chown -R $USER $WP_DIR
+  cd $WP_DIR
+
+  echo "The new Bedrock site has been created at $WP_DIR"
+  echo "It is owned by \"$USER\""
+
+}
+
+# ------------------------------------------------------------------------------
+# Build new database
+#
+# Username is just the "salted" db name. For publicly accessible databases,
+# consider making this more secure.
+# ------------------------------------------------------------------------------
+
+setup_database() {
+
+  echo -e "This script will create a local database with a new user."
+  echo -e "Enter the name of the new database:"
+  read  DB_NAME
+
+  DB_USER=$DB_NAME
+  DB_USER+=_user
+
+  echo -e "Enter a STRONG password for the new database:"
+  read DB_PASS
+
+  # For security purposes, ask for a table prefix. Default to 'wp_'
+  DB_PREFIX=wp_
+  echo -e "Please enter a database table prefix. Leave out the underscore. Defaults to 'wp_'."
+  read DB_PREFIX
+  DB_PREFIX+="_"
+
+  if [ "$DB_PREFIX" = "" ]; then
+    $DB_PREFIX=wp_
+  fi
+
+  echo -e "Enter the MySQL root password:"
+  read  ROOT_PASSWORD
+
+  DB_ARGS="CREATE DATABASE $DB_NAME;GRANT ALL PRIVILEGES ON $DB_NAME.* TO $DB_USER@localhost IDENTIFIED BY '$DB_PASS';FLUSH PRIVILEGES;"
+  mysql -u root -p$ROOT_PASSWORD -e "$DB_ARGS"
+
+  if [ $? != "0" ]; then  # NB "0" is the return from successful completion of the previous operation in BASH.
+    echo "[Error]: Database creation failed"
+    exit 1
+  #else
+
+  fi
+
+}
+
+create_config() {
+
+  cp $WP_DIR/.env.example $WP_DIR/.env
+
+  #cat << EOF > $WP_DIR/temp.env
+  CONFIG_ARGS=<< EOF
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASS
+DB_HOST=localhost
+
+WP_ENV=development
+WP_HOME=http://localhost/$SITE_NAME
+WP_SITEURL=${WP_HOME}/wp
+
+EOF
+
+  SALTS=<< EOF
+\# SALTS
+  # Generate your keys here: https://roots.io/salts.html
+$(curl -L https://api.wordpress.org/secret-key/1.1/salt/)
+EOF
+
+echo $CONFIG_ARGS+$SALTS > $WP_DIR/.env
+
+}
+setup_bedrock
+setup_database
+create_config
