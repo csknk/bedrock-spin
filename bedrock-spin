@@ -1,3 +1,6 @@
+#!/bin/bash
+#
+# This script:
 
 setup_bedrock() {
 
@@ -61,32 +64,99 @@ setup_database() {
 
 }
 
+# ------------------------------------------------------------------------------
+# Set up wp-config.php using WP-CLI
+# ------------------------------------------------------------------------------
+configure_database() {
+
+  WP_PATH=http://localhost/$SITE_NAME
+
+  # ----------------------------------------------------------------------------
+  # Install WordPress. WP-CLI.
+  # ----------------------------------------------------------------------------
+  echo -e "Enter a strong password for WordPress - your database might be exported to a publicly accessible server, so please set a strong password."
+  read WP_PASS
+
+  echo -e "Enter a username. NOT 'ADMIN'!"
+  read WP_USERNAME
+
+  wp core install --url=$WP_PATH --title="Basic Test Site" --admin_user=$WP_USERNAME --admin_password=$WP_PASS --admin_email=info@carawebs.com
+
+  # discourage search engines
+  wp option update blog_public 0
+
+  # delete sample page, and create homepage
+  wp post delete $(wp post list --post_type=page --posts_per_page=1 --post_status=publish --pagename="sample-page" --field=ID --format=ids)
+  wp post create --post_type=page --post_title=Home --post_status=publish --post_author=$(wp user get $WP_USERNAME --field=ID --format=ids)
+  wp post create --post_type=page --post_title=About --post_status=publish --post_author=$(wp user get $WP_USERNAME --field=ID --format=ids)
+
+  # delete readme and license
+  rm license.txt
+  rm readme.html
+
+  # set homepage as front page
+  wp option update show_on_front 'page'
+
+  # set homepage to be the new page
+  wp option update page_on_front $(wp post list --post_type=page --post_status=publish --posts_per_page=1 --pagename=home --field=ID --format=ids)
+
+  # set pretty urls
+  wp rewrite structure '/%postname%/' --hard
+  wp rewrite flush --hard
+
+  # delete akismet and hello dolly
+  # wp plugin delete akismet
+  # wp plugin delete hello
+
+  echo "------------------------------------------"
+  echo " WordPress has been installed successfully: $WP_PATH "
+  echo "------------------------------------------"
+  echo " DB Info: "
+  echo ""
+  echo " DB Name: $DB_NAME"
+  echo " DB User: $DB_USER"
+  echo " DB Pass: $DB_PASS"
+  echo "------------------------------------------"
+  echo " WordPress User details:"
+  echo ""
+  echo " WP username: $WP_USERNAME"
+  echo " WP password: $WP_PASS"
+
+}
+
 create_config() {
 
-  cp $WP_DIR/.env.example $WP_DIR/.env
+  touch $WP_DIR/.env
 
-  #cat << EOF > $WP_DIR/temp.env
-  CONFIG_ARGS=<< EOF
+  nl=$'\n'
+  read -r -d '' CONFIG_ARGS << EOF
 DB_NAME=$DB_NAME
 DB_USER=$DB_USER
 DB_PASSWORD=$DB_PASS
 DB_HOST=localhost
+DB_PREFIX=$DB_PREFIX
 
 WP_ENV=development
-WP_HOME=http://localhost/$SITE_NAME
-WP_SITEURL=${WP_HOME}/wp
-
+WP_HOME=http://localhost/$SITE_NAME/web
+WP_SITEURL=http://localhost/$SITE_NAME/web/wp
 EOF
 
-  SALTS=<< EOF
-\# SALTS
-  # Generate your keys here: https://roots.io/salts.html
-$(curl -L https://api.wordpress.org/secret-key/1.1/salt/)
-EOF
+SALTS=$(node /home/david/bash-projects-public/bedrock-spin/generate-salts.js)
+#SALTS=$(wp dotenv salts generate)
 
-echo $CONFIG_ARGS+$SALTS > $WP_DIR/.env
+COMBINED_CONFIG=${CONFIG_ARGS}$'\n\n'${SALTS}
+
+printf "%s" "$COMBINED_CONFIG" > $WP_DIR/.env
+
+cd $WP_DIR
+wp dotenv salts regenerate
 
 }
+
+# ------------------------------------------------------------------------------
+# Let's go!
+# ------------------------------------------------------------------------------
 setup_bedrock
 setup_database
 create_config
+configure_database
