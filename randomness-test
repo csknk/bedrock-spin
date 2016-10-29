@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# Test for duplicates
+
+function randomness_tester() {
+
+  echo -e "Randomness Tester"
+
+  i="0"
+  VAL_ARRAY=()
+  #VAL_ARRAY+="skunk"
+  #VAL_ARRAY["skunk"]=1
+
+  DUPLICATE_COUNT="0"
+  END=100000
+
+  # for (( i = 0; i < 10; i++ )); do
+  #   #statements
+  # done
+
+  #while [[ $i -lt 10000 ]]; do
+  for (( $i; $i < $END; i++ )); do
+
+    # Get a random string
+    STRING=$(random_string)
+
+    # if [[ "$i" = "3" ]]; then
+    #   echo "SKUNK"
+    #   STRING="skunk"
+    # fi
+
+    # Does it exist in $ARRAY?
+    if [[ " ${VAL_ARRAY[@]} " =~ " ${STRING} " ]]; then
+
+      #echo "Dupe"
+      DUPLICATE_COUNT=$[$DUPLICATE_COUNT+1]
+
+    fi
+
+    VAL_ARRAY+=("${STRING}")
+
+    i=$[$i+1]
+
+  done
+
+  # printf "%s\n" "printf the RESULT:"
+  #printf "%s\n" "${VAL_ARRAY[@]}"
+  # for each in "${VAL_ARRAY[@]}"
+  # do
+  #   echo "LOOPED: $each"
+  #   #echo
+  # done
+  printf "Duplicates Found: %s\n" "$DUPLICATE_COUNT"
+
+}
+
+random_string() {
+
+  head /dev/urandom | tr -dc '[:print:]' | head -c 64
+
+}
+
+randomness_tester

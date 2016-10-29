@@ -1,18 +1,75 @@
 #!/bin/bash
 #
+# composer=/usr/local/bin/composer.phar
 # This script:
+#
+#
 
-setup_bedrock() {
+THIS=$(readlink -f ${BASH_SOURCE[0]})
+PROJECT_DIR=$(dirname $THIS)
+. "$PROJECT_DIR/hello"
+hello
 
-  echo -e "Please enter the full path to the new site, e.g. /var/www/html/newproject:"
-  read WP_DIR
+echo -e "Directory is $PROJECT_DIR"
 
-  # basename of the $DIR - used as the destination directory, under `/var/www/html`
-  SITE_NAME=$(basename $WP_DIR)
+################################################################################
+# Set up Bedrock using Composer
+#
+################################################################################
+function setup_bedrock() {
+
+  PS3='Please enter the environment: '
+  #SITE_ENVS=("development" "staging" "production" "Quit")
+  select SITE_ENV in development staging production Quit
+  do
+    #echo "$SITE_ENV selected"
+      case "$SITE_ENV" in
+          "development")
+              echo "$SITE_ENV selected"
+              break
+              ;;
+          "staging")
+              echo "$SITE_ENV selected"
+              break
+              ;;
+          "production")
+              echo "$SITE_ENV selected"
+              break
+              ;;
+          "Quit")
+              break
+              ;;
+          *) echo invalid option;;
+      esac
+  done
+
+  echo -e "Please enter the root domain for the new site, e.g. example.com:"
+  read SITE_NAME
+
+  WP_DIR=/var/www/html/$SITE_NAME
+
+  sudo mkdir $WP_DIR
+
+  # echo -e "Please enter the full URL for the new site, e.g. http://example.com:"
+  # read WP_PATH
+  WP_PATH=http://$SITE_NAME
+
+  echo -e "Please enter the admin email address:"
+  read EMAIL
+
+  # Set ownership for directory
+  sudo chown -R $USER:www-data $WP_DIR
 
   # Create new directory and use WP-CLI to download WordPress
   composer create-project roots/bedrock $WP_DIR
-  sudo chown -R $USER $WP_DIR
+
+  # Set ownership for directory
+  #sudo chown -R www-data:$USER $WP_DIR
+
+  # Set directory & file permissions using an absolute path:
+  find /var/www/html/$SITE_NAME -type d -exec chmod 755 {} \;
+  find /var/www/html/$SITE_NAME -type f -exec chmod 644 {} \;
+
   cd $WP_DIR
 
   echo "The new Bedrock site has been created at $WP_DIR"
@@ -20,14 +77,14 @@ setup_bedrock() {
 
 }
 
-# ------------------------------------------------------------------------------
+################################################################################
 # Build new database
 #
 # Username is just the "salted" db name. For publicly accessible databases,
 # consider making this more secure.
-# ------------------------------------------------------------------------------
+################################################################################
 
-setup_database() {
+function setup_database() {
 
   echo -e "This script will create a local database with a new user."
   echo -e "Enter the name of the new database:"
@@ -40,17 +97,20 @@ setup_database() {
   read DB_PASS
 
   # For security purposes, ask for a table prefix. Default to 'wp_'
-  DB_PREFIX=wp_
   echo -e "Please enter a database table prefix. Leave out the underscore. Defaults to 'wp_'."
   read DB_PREFIX
-  DB_PREFIX+="_"
 
   if [ "$DB_PREFIX" = "" ]; then
-    $DB_PREFIX=wp_
+    DB_PREFIX=wp_
+
+  else
+    DB_PREFIX=${DB_PREFIX}_
   fi
 
+  echo "Prefix: $DB_PREFIX"
+
   echo -e "Enter the MySQL root password:"
-  read  ROOT_PASSWORD
+  read ROOT_PASSWORD
 
   DB_ARGS="CREATE DATABASE $DB_NAME;GRANT ALL PRIVILEGES ON $DB_NAME.* TO $DB_USER@localhost IDENTIFIED BY '$DB_PASS';FLUSH PRIVILEGES;"
   mysql -u root -p$ROOT_PASSWORD -e "$DB_ARGS"
@@ -58,31 +118,28 @@ setup_database() {
   if [ $? != "0" ]; then  # NB "0" is the return from successful completion of the previous operation in BASH.
     echo "[Error]: Database creation failed"
     exit 1
-  #else
 
   fi
 
 }
 
-# ------------------------------------------------------------------------------
-# Set up wp-config.php using WP-CLI
-# ------------------------------------------------------------------------------
-configure_database() {
+################################################################################
+# Set up wp-config.php.
+#
+# Requires WP-CLI
+################################################################################
+function configure_database() {
 
-  WP_PATH=http://localhost/$SITE_NAME
-
-  # ----------------------------------------------------------------------------
-  # Install WordPress. WP-CLI.
-  # ----------------------------------------------------------------------------
+  # Install WordPress
   echo -e "Enter a strong password for WordPress - your database might be exported to a publicly accessible server, so please set a strong password."
   read WP_PASS
 
   echo -e "Enter a username. NOT 'ADMIN'!"
   read WP_USERNAME
 
-  wp core install --url=$WP_PATH --title="Basic Test Site" --admin_user=$WP_USERNAME --admin_password=$WP_PASS --admin_email=info@carawebs.com
+  wp core install --url=$WP_PATH --title="Basic Test Site" --admin_user=$WP_USERNAME --admin_password=$WP_PASS --admin_email=$EMAIL
 
-  # discourage search engines
+  # Discourage search engines
   wp option update blog_public 0
 
   # delete sample page, and create homepage
@@ -124,11 +181,24 @@ configure_database() {
 
 }
 
+################################################################################
+# Generate a .env file in the project root and populate the file with values.
+#
+# ##############################################################################
 create_config() {
+
+  ## Temp
+  # DB_NAME=DB
+  # DB_USER=DB_USER
+  # DB_PASSWORD=DB_PASS
+  # DB_HOST=localhost
+  # DB_PREFIX=DB_PREFIX
+  # SITE_NAME=sitename
+  # WP_DIR=$(pwd)
+  ## End Temp
 
   touch $WP_DIR/.env
 
-  nl=$'\n'
   read -r -d '' CONFIG_ARGS << EOF
 DB_NAME=$DB_NAME
 DB_USER=$DB_USER
@@ -136,27 +206,252 @@ DB_PASSWORD=$DB_PASS
 DB_HOST=localhost
 DB_PREFIX=$DB_PREFIX
 
-WP_ENV=development
-WP_HOME=http://localhost/$SITE_NAME/web
-WP_SITEURL=http://localhost/$SITE_NAME/web/wp
+WP_ENV=$SITE_ENV
+WP_HOME=$WP_PATH
+WP_SITEURL=$WP_PATH/wp
+
+# Working:
+#WP_HOME=http://bedtest.ie
+#WP_SITEURL=${WP_HOME}/wp
+
 EOF
 
-SALTS=$(node /home/david/bash-projects-public/bedrock-spin/generate-salts.js)
-#SALTS=$(wp dotenv salts generate)
+  SALTS=$(generate_salts)
 
-COMBINED_CONFIG=${CONFIG_ARGS}$'\n\n'${SALTS}
+  COMBINED_CONFIG=${CONFIG_ARGS}$'\n'${SALTS}
 
-printf "%s" "$COMBINED_CONFIG" > $WP_DIR/.env
+  printf "%s" "$COMBINED_CONFIG" > $WP_DIR/.env
 
-cd $WP_DIR
-wp dotenv salts regenerate
+  cd $WP_DIR
 
 }
 
-# ------------------------------------------------------------------------------
-# Let's go!
-# ------------------------------------------------------------------------------
+function generate_salts() {
+
+  IFS=; read -r -d '' SALTS << EOF
+
+AUTH_KEY=$(random_string)
+SECURE_AUTH_KEY=$(random_string)
+LOGGED_IN_KEY=$(random_string)
+NONCE_KEY=$(random_string)
+AUTH_SALT=$(random_string)
+SECURE_AUTH_SALT=$(random_string)
+LOGGED_IN_SALT=$(random_string)
+NONCE_SALT=$(random_string)
+EOF
+
+  echo $SALTS
+
+}
+
+################################################################################
+# Generate a random string from /dev/urandom.
+#
+# A keyspace is defined by passing the initial random output to tr - the keyspace
+# could be overtly defined e.g. 'A-Za-z0-9!"#$%&'\''()*+,-./:;<=>?@[\]^_`{|}~'.
+# The [:print:] option returns printable characters, which is probably OK for our
+# purposes. Rationale: if BASH can print it, it will be ok when used by our WP
+# script.
+#
+# Note that dotenv values containing spaces must be surrounded by quotes.
+#
+################################################################################
+function random_string() {
+
+  local STR="$(head /dev/urandom | tr -dc '[:print:]' | head -c 64)"
+
+  # Does the string contain a space character?
+  if [[ $STR == *" "* ]]
+  then
+    STR=\'{$STR}\'
+  fi
+  echo "$STR"
+
+}
+
+################################################################################
+# Setup Sage starter theme.
+#
+################################################################################
+setup_theme() {
+
+  echo -e "Choose a name for the new theme:"
+  read THEMENAME
+
+  # TODO: Check Paths!!
+  # ----------------------------------------------------------------------------
+  composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME 9.0.0-alpha.1
+  # ----------------------------------------------------------------------------
+  cd $WP_DIR/web/app/themes/$THEMENAME
+  replace "bedrock" "$THEMENAME" -- assets/config.json
+
+  printf "Run NPM Install:\n"
+  npm install
+
+  printf "Run NPM Build:\n"
+  npm run build
+
+  printf "Activate Sage:\n"
+  wp theme activate $THEMENAME
+
+  read -p "Set up a new GitHub repo for $THEMENAME? [y/N]" yn
+  case $yn in
+    [Yy]* ) setup_repo;;
+    [Nn]* ) ;;
+    * ) echo "Please answer yes or no.";;
+  esac
+
+  read -p "Do you want to open this project in Atom? [y/N]" yn
+  case $yn in
+    [Yy]* ) atom .;;
+    [Nn]* ) exit ;;
+    * ) echo "Please answer yes or no.";;
+  esac
+
+}
+
+################################################################################
+# Set up a GitHub Repo
+#
+################################################################################
+function setup_repo () {
+
+  cd $WP_DIR/web/app/themes/$THEMENAME
+
+  # remove existing git repo
+  sudo rm -rf $WP_DIR/wp-content/themes/$THEMENAME/.git
+  git init
+  repo_name=$1
+  dir_name=`basename $(pwd)`
+  invalid_credentials=0
+
+  if [ "$repo_name" = "" ]; then
+    echo "  Repo name (hit enter to use '$dir_name')?"
+    read repo_name
+  fi
+
+  if [ "$repo_name" = "" ]; then
+    repo_name=$dir_name
+  fi
+
+  GIT_USERNAME=`git config github.user`
+  if [ "$GIT_USERNAME" = "" ]; then
+    echo "  Could not find Git username, run 'git config --global github.user <username>'"
+    invalid_credentials=1
+  fi
+
+  token=`git config github.token`
+  if [ "$token" = "" ]; then
+    echo "  Could not find token, run 'git config --global github.token <token>'"
+    invalid_credentials=1
+  fi
+
+  if [ "$invalid_credentials" -eq "1" ]; then
+    return 1
+  fi
+
+  echo -n "  Creating Github repository '$repo_name' ..."
+  curl -u "$GIT_USERNAME:$token" https://api.github.com/user/repos -d '{"name":"'$repo_name'"}' > /dev/null 2>&1
+  echo " done."
+
+  echo -n "  Pushing local code to remote ..."
+  git remote add origin git@github.com:$GIT_USERNAME/$repo_name.git > /dev/null 2>&1
+  git push -u origin master > /dev/null 2>&1
+  git add -A
+  git commit -m "First Commit"
+  git push origin master
+  echo " done."
+
+}
+
+################################################################################
+# Configure and enable an Apache vhost directive
+#
+################################################################################
+apache_vhost() {
+
+  VHOST_NAME=$SITE_NAME.conf
+  CONFIG=/etc/apache2/sites-available/$VHOST_NAME
+
+  echo -e "|--------------------------------------------------------------------|"
+  echo -e "| You have chosen to set up an Apache vhosts directive.              |"             |
+  echo -e "| This will involve creating and activating an Apache config file:   |"
+  echo -e "| /etc/apache2/sites-available/$SITE_NAME.conf.                      |"
+  echo -e "| This will require sudo privileges.                                 |"
+  echo -e "| For the moment this sets up a vhost for port 80(http protocol).    |"
+  echo -e "|--------------------------------------------------------------------|"
+
+  sudo touch $CONFIG
+
+  read -r -d '' VHOST_DIRECTIVES << EOF
+<VirtualHost *:80>
+        ServerName $SITE_NAME
+        ServerAlias www.$SITE_NAME
+        ServerAdmin info@example.com
+        DocumentRoot /var/www/html/$SITE_NAME/web
+        <Directory /var/www/html/$SITE_NAME/web>
+                Options -Indexes +FollowSymLinks
+                AllowOverride All
+                Require all granted
+        </Directory>
+        ErrorLog \${APACHE_LOG_DIR}/$SITE_NAME.error.log
+        CustomLog \${APACHE_LOG_DIR}/$SITE_NAME.access.log combined
+</VirtualHost>
+
+EOF
+
+  # See http://unix.stackexchange.com/a/19708
+  printf "%s" "$VHOST_DIRECTIVES" | sudo tee $CONFIG
+
+  # enable newly created virtualhost
+  echo "Running a2ensite..."
+  sudo a2ensite $VHOST_NAME
+
+  echo "Restarting Apache..."
+  sudo /etc/init.d/apache2 restart
+
+}
+
+function install_soil() {
+
+  composer require roots/soil 3.7.1
+
+  wp plugin activate soil
+
+}
+
+function options() {
+
+  read -p "Do you want to install and activate the Roots \"Soil\" plugin? [y/N]" yn
+  case $yn in
+    [Yy]* ) install_soil;;
+    [Nn]* ) exit ;;
+    * ) echo "Please answer yes or no.";;
+  esac
+
+  read -p "Do you want to set up and install an Apache virtual hosts directive? [y/N]" yn
+  case $yn in
+    [Yy]* ) apache_vhost;;
+    [Nn]* ) exit ;;
+    * ) echo "Please answer yes or no.";;
+  esac
+
+  read -p "Do you want to set up the Sage Starter theme? [y/N]" yn
+  case $yn in
+    [Yy]* ) setup_theme;;
+    [Nn]* ) exit ;;
+    * ) echo "Please answer yes or no.";;
+  esac
+
+}
+
+################################################################################
+# All set? Let's go!
+#
+# Trigger the functions in this script in the correct order.
+################################################################################
 setup_bedrock
 setup_database
 create_config
 configure_database
+options
