@@ -3,44 +3,60 @@
 # composer=/usr/local/bin/composer.phar
 # This script:
 #
+# - Downloads and installs a Bedrock project to a directory you specify
+# -
 #
+# Notes re: MacOS
+# I don't think the tr command is available on Mac - this is used by this script
+# to generate passwords.
+################################################################################
 
+# Set the Project directory
 THIS=$(readlink -f ${BASH_SOURCE[0]})
 PROJECT_DIR=$(dirname $THIS)
-. "$PROJECT_DIR/hello"
-hello
+
+# Include dependencies
+. "$PROJECT_DIR/password-generation"
 
 echo -e "Directory is $PROJECT_DIR"
 
 ################################################################################
-# Set up Bedrock using Composer
+# Set the environment, URL, path and other important variables
 #
+################################################################################
+function environment_and_path() {
+
+
+}
+
+################################################################################
+# Set up Bedrock using Composer.
+#
+# Composer needs to be in your $PATH.
 ################################################################################
 function setup_bedrock() {
 
   PS3='Please enter the environment: '
-  #SITE_ENVS=("development" "staging" "production" "Quit")
   select SITE_ENV in development staging production Quit
   do
-    #echo "$SITE_ENV selected"
-      case "$SITE_ENV" in
-          "development")
-              echo "$SITE_ENV selected"
-              break
-              ;;
-          "staging")
-              echo "$SITE_ENV selected"
-              break
-              ;;
-          "production")
-              echo "$SITE_ENV selected"
-              break
-              ;;
-          "Quit")
-              break
-              ;;
-          *) echo invalid option;;
-      esac
+    case "$SITE_ENV" in
+      "development")
+          echo "$SITE_ENV selected"
+          break
+          ;;
+      "staging")
+          echo "$SITE_ENV selected"
+          break
+          ;;
+      "production")
+          echo "$SITE_ENV selected"
+          break
+          ;;
+      "Quit")
+          break
+          ;;
+      *) echo invalid option;;
+    esac
   done
 
   echo -e "Please enter the root domain for the new site, e.g. example.com:"
@@ -48,13 +64,18 @@ function setup_bedrock() {
 
   WP_DIR=/var/www/html/$SITE_NAME
 
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e "| Sudo privilege will be used to create your new project directory. |"
+  echo -e "| Once created, the directory will be chown'd to your \$USER.       |"
+  echo -e "| Composer will then install Bedrock.                               |"
+  echo -e "+-------------------------------------------------------------------+"
+  echo ""
+
   sudo mkdir $WP_DIR
 
-  # echo -e "Please enter the full URL for the new site, e.g. http://example.com:"
-  # read WP_PATH
   WP_PATH=http://$SITE_NAME
 
-  echo -e "Please enter the admin email address:"
+  echo -e "Please enter the admin email address for this project:"
   read EMAIL
 
   # Set ownership for directory
@@ -63,41 +84,47 @@ function setup_bedrock() {
   # Create new directory and use WP-CLI to download WordPress
   composer create-project roots/bedrock $WP_DIR
 
-  # Set ownership for directory
-  #sudo chown -R www-data:$USER $WP_DIR
-
   # Set directory & file permissions using an absolute path:
   find /var/www/html/$SITE_NAME -type d -exec chmod 755 {} \;
   find /var/www/html/$SITE_NAME -type f -exec chmod 644 {} \;
 
   cd $WP_DIR
 
-  echo "The new Bedrock site has been created at $WP_DIR"
-  echo "It is owned by \"$USER\""
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e "| The new Bedrock site has been created at $WP_DIR.                 |"
+  echo -e "| It is owned by \"$USER\".                                         |"
+  echo -e "+-------------------------------------------------------------------+"
+  echo ""
 
 }
 
 ################################################################################
-# Build new database
+# Build new database.
 #
-# Username is just the "salted" db name. For publicly accessible databases,
-# consider making this more secure.
+# Username is based on the chosen database name. For shared hosting environments,
+# should this be more secure? Probably not relevant in a VPS context.
 ################################################################################
 
 function setup_database() {
 
-  echo -e "This script will create a local database with a new user."
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e "| This script will create a local database with a new user.         |"
+  echo -e "| You will be prompted to set new passwords, and you will need      |"
+  echo -e "| to enter your MySQL/MariaDB root password.                        |"
+  echo -e "+-------------------------------------------------------------------|"
+  echo -e ""
   echo -e "Enter the name of the new database:"
   read  DB_NAME
 
   DB_USER=$DB_NAME
   DB_USER+=_user
 
-  echo -e "Enter a STRONG password for the new database:"
-  read DB_PASS
+  # echo -e "Enter a STRONG password for the new database:"
+  # read DB_PASS
+  DB_PASS=$(random_password 32 alnum)
 
   # For security purposes, ask for a table prefix. Default to 'wp_'
-  echo -e "Please enter a database table prefix. Leave out the underscore. Defaults to 'wp_'."
+  echo -e "If required, enter a database table prefix. Leave out the underscore. Defaults to 'wp_'."
   read DB_PREFIX
 
   if [ "$DB_PREFIX" = "" ]; then
@@ -109,15 +136,26 @@ function setup_database() {
 
   echo "Prefix: $DB_PREFIX"
 
-  echo -e "Enter the MySQL root password:"
+  echo -e "Enter the MySQL/MariaDB root password:"
   read ROOT_PASSWORD
 
   DB_ARGS="CREATE DATABASE $DB_NAME;GRANT ALL PRIVILEGES ON $DB_NAME.* TO $DB_USER@localhost IDENTIFIED BY '$DB_PASS';FLUSH PRIVILEGES;"
   mysql -u root -p$ROOT_PASSWORD -e "$DB_ARGS"
 
-  if [ $? != "0" ]; then  # NB "0" is the return from successful completion of the previous operation in BASH.
-    echo "[Error]: Database creation failed"
+  if [ $? != "0" ]
+
+  then
+
+    echo "[Error]: Database creation failed."
     exit 1
+
+  else
+
+    echo -e "+-----------------------------------------------------------------+"
+    echo -e "| Successfully created database $DB_NAME. The database details    |"
+    echo -e "| will be added to your project's .env file.                      |"
+    echo -e "+-----------------------------------------------------------------+"
+    echo -e ""
 
   fi
 
@@ -131,8 +169,9 @@ function setup_database() {
 function configure_database() {
 
   # Install WordPress
-  echo -e "Enter a strong password for WordPress - your database might be exported to a publicly accessible server, so please set a strong password."
-  read WP_PASS
+  #echo -e "Enter a password for WordPress.\nYour database might be exported to a publicly accessible server, so please set a strong password."
+  #read WP_PASS
+  WP_PASS=$(random_password)
 
   echo -e "Enter a username. NOT 'ADMIN'!"
   read WP_USERNAME
@@ -187,16 +226,6 @@ function configure_database() {
 # ##############################################################################
 create_config() {
 
-  ## Temp
-  # DB_NAME=DB
-  # DB_USER=DB_USER
-  # DB_PASSWORD=DB_PASS
-  # DB_HOST=localhost
-  # DB_PREFIX=DB_PREFIX
-  # SITE_NAME=sitename
-  # WP_DIR=$(pwd)
-  ## End Temp
-
   touch $WP_DIR/.env
 
   read -r -d '' CONFIG_ARGS << EOF
@@ -223,49 +252,6 @@ EOF
   printf "%s" "$COMBINED_CONFIG" > $WP_DIR/.env
 
   cd $WP_DIR
-
-}
-
-function generate_salts() {
-
-  IFS=; read -r -d '' SALTS << EOF
-
-AUTH_KEY=$(random_string)
-SECURE_AUTH_KEY=$(random_string)
-LOGGED_IN_KEY=$(random_string)
-NONCE_KEY=$(random_string)
-AUTH_SALT=$(random_string)
-SECURE_AUTH_SALT=$(random_string)
-LOGGED_IN_SALT=$(random_string)
-NONCE_SALT=$(random_string)
-EOF
-
-  echo $SALTS
-
-}
-
-################################################################################
-# Generate a random string from /dev/urandom.
-#
-# A keyspace is defined by passing the initial random output to tr - the keyspace
-# could be overtly defined e.g. 'A-Za-z0-9!"#$%&'\''()*+,-./:;<=>?@[\]^_`{|}~'.
-# The [:print:] option returns printable characters, which is probably OK for our
-# purposes. Rationale: if BASH can print it, it will be ok when used by our WP
-# script.
-#
-# Note that dotenv values containing spaces must be surrounded by quotes.
-#
-################################################################################
-function random_string() {
-
-  local STR="$(head /dev/urandom | tr -dc '[:print:]' | head -c 64)"
-
-  # Does the string contain a space character?
-  if [[ $STR == *" "* ]]
-  then
-    STR=\'{$STR}\'
-  fi
-  echo "$STR"
 
 }
 
@@ -373,13 +359,13 @@ apache_vhost() {
   VHOST_NAME=$SITE_NAME.conf
   CONFIG=/etc/apache2/sites-available/$VHOST_NAME
 
-  echo -e "|--------------------------------------------------------------------|"
+  echo -e "+--------------------------------------------------------------------+"
   echo -e "| You have chosen to set up an Apache vhosts directive.              |"             |
   echo -e "| This will involve creating and activating an Apache config file:   |"
   echo -e "| /etc/apache2/sites-available/$SITE_NAME.conf.                      |"
   echo -e "| This will require sudo privileges.                                 |"
   echo -e "| For the moment this sets up a vhost for port 80(http protocol).    |"
-  echo -e "|--------------------------------------------------------------------|"
+  echo -e "+--------------------------------------------------------------------+"
 
   sudo touch $CONFIG
 
@@ -444,6 +430,25 @@ function options() {
   esac
 
 }
+
+function generate_salts() {
+
+  IFS=; read -r -d '' SALTS << EOF
+
+AUTH_KEY=$(random_salt)
+SECURE_AUTH_KEY=$(random_salt)
+LOGGED_IN_KEY=$(random_salt)
+NONCE_KEY=$(random_salt)
+AUTH_SALT=$(random_salt)
+SECURE_AUTH_SALT=$(random_salt)
+LOGGED_IN_SALT=$(random_salt)
+NONCE_SALT=$(random_salt)
+EOF
+
+  echo $SALTS
+
+}
+
 
 ################################################################################
 # All set? Let's go!
