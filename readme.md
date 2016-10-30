@@ -13,3 +13,4 @@ Generate random passwords
 - [Article on the use of the Linux tr(translate) command](http://www.thegeekstuff.com/2012/12/linux-tr-command/)
 - [tr mand page](http://ss64.com/bash/tr.html)
 - [Expand to a string with the result of the command executed](http://stackoverflow.com/a/25215059/3590673)
+- [Color in BASH scripts (SO answer)](http://stackoverflow.com/a/5947802/3590673)
