@@ -69,6 +69,8 @@ function environment_and_path() {
   echo -e "| Selecting 'localhost' won't require adjusting '/etc/hosts'        |"
   echo -e "| for local development. For a production environment, you'll       |"
   echo -e "| need the 'standalone' option.                                     |"
+  echo -e "| NOTE: if you choose 'localhost' you won't get an option to set    |"
+  echo -e "| a virtual host for your project.                                  |"
   echo -e "+-------------------------------------------------------------------+"
   echo -e ${NC}
 
@@ -93,11 +95,22 @@ function environment_and_path() {
 
   if [[ $DOMAIN_TYPE == standalone ]]; then
 
-    echo -e "Please enter the root domain for the new site."
+    echo -e ${YELLOW}
     echo -e "+-----------------------------------------------------------------+"
+    echo -e "| Set the root domain for this project.                           |"
     echo -e "| IMPORTANT: use the format 'example.com':                        |"
     echo -e "+-----------------------------------------------------------------+"
-    read SITE_NAME
+    echo -e ${NC}
+
+    regex="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$"
+
+    SITE_NAME=""
+    while [[ ! $SITE_NAME =~ $regex ]]; do
+
+      echo "Enter a root domain in the format 'example.com':"
+      read SITE_NAME
+
+    done
 
     WP_PATH=http://$SITE_NAME
 
@@ -124,11 +137,13 @@ function environment_and_path() {
 ################################################################################
 function setup_bedrock() {
 
+  echo -e ${YELLOW}
   echo -e "+-------------------------------------------------------------------+"
   echo -e "| Sudo privilege will be used to create your new project directory. |"
   echo -e "| Once created, the directory will be chown'd to your \$USER.       |"
   echo -e "| Composer will then install Bedrock.                               |"
   echo -e "+-------------------------------------------------------------------+"
+  echo -e ${NC}
   echo ""
 
   sudo mkdir $WP_DIR
@@ -148,10 +163,12 @@ function setup_bedrock() {
 
   cd $WP_DIR
 
+  echo -e ${YELLOW}
   echo -e "+-------------------------------------------------------------------+"
   echo -e "| The new Bedrock site has been created at $WP_DIR.                 |"
   echo -e "| It is owned by \"$USER\".                                         |"
   echo -e "+-------------------------------------------------------------------+"
+  echo -e ${NC}
   echo ""
 
 }
@@ -165,11 +182,13 @@ function setup_bedrock() {
 
 function setup_database() {
 
+  echo -e ${YELLOW}
   echo -e "+-------------------------------------------------------------------+"
   echo -e "| This script will create a local database with a new user.         |"
   echo -e "| You will be prompted to set new passwords, and you will need      |"
   echo -e "| to enter your MySQL/MariaDB root password.                        |"
   echo -e "+-------------------------------------------------------------------|"
+  echo -e ${NC}
   echo -e ""
   echo -e "Enter the name of the new database:"
   read  DB_NAME
@@ -204,15 +223,21 @@ function setup_database() {
 
   then
 
-    echo "[Error]: Database creation failed."
+    echo -e ${RED}
+    echo -e "+-----------------------------------------------------------------+"
+    echo -e "| [Error]: Database creation failed.                              |"
+    echo -e "+-----------------------------------------------------------------+"
+    echo -e ${NC}
     exit 1
 
   else
 
+    echo -e ${YELLOW}
     echo -e "+-----------------------------------------------------------------+"
     echo -e "| Successfully created database $DB_NAME. The database details    |"
     echo -e "| will be added to your project's .env file.                      |"
     echo -e "+-----------------------------------------------------------------+"
+    echo -e ${NC}
     echo -e ""
 
   fi
@@ -225,6 +250,14 @@ function setup_database() {
 # Requires WP-CLI
 ################################################################################
 function configure_database() {
+
+  echo -e ${YELLOW}
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e "| Configure the  new Database for WordPress.                        |"
+  echo -e "| A strong password will be automatically assigned for your admin   |"
+  echo -e "| user. You'll have access to this at the end of the config process.|"
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e ${NC}
 
   # Install WordPress
   #echo -e "Enter a password for WordPress.\nYour database might be exported to a publicly accessible server, so please set a strong password."
@@ -258,23 +291,21 @@ function configure_database() {
   wp rewrite structure '/%postname%/' --hard
   wp rewrite flush --hard
 
-  # delete akismet and hello dolly
-  # wp plugin delete akismet
-  # wp plugin delete hello
-
-  echo "------------------------------------------"
-  echo " WordPress has been installed successfully: $WP_PATH "
-  echo "------------------------------------------"
-  echo " DB Info: "
-  echo ""
-  echo " DB Name: $DB_NAME"
-  echo " DB User: $DB_USER"
-  echo " DB Pass: $DB_PASS"
-  echo "------------------------------------------"
-  echo " WordPress User details:"
-  echo ""
-  echo " WP username: $WP_USERNAME"
-  echo " WP password: $WP_PASS"
+  echo -e ${YELLOW}
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e "| WordPress has been installed successfully.                        |"
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e ""
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e "DB Info:"
+  echo -e "DB Name: $DB_NAME"
+  echo -e "DB User: $DB_USER"
+  echo -e "DB Pass: $DB_PASS"
+  echo -e "\nWordPress User details:"
+  echo -e "WP username: $WP_USERNAME"
+  echo -e "WP password: $WP_PASS"
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e ${NC}
 
 }
 
@@ -315,13 +346,15 @@ EOF
 ################################################################################
 setup_theme() {
 
-  echo -e "Choose a name for the new theme:"
+  echo -e ${YELLOW}
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e "| Choose a name for the new theme:                                  |"
+  echo -e "+-------------------------------------------------------------------+"
+  echo -e ${NC}
   read THEMENAME
 
-  # TODO: Check Paths!!
-  # ----------------------------------------------------------------------------
   composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME 9.0.0-alpha.1
-  # ----------------------------------------------------------------------------
+
   cd $WP_DIR/web/app/themes/$THEMENAME
   replace "bedrock" "$THEMENAME" -- assets/config.json
 
@@ -469,12 +502,14 @@ function options() {
     * ) echo "Please answer yes or no.";;
   esac
 
-  read -p "Do you want to set up and install an Apache virtual hosts directive? [y/N]" yn
-  case $yn in
-    [Yy]* ) apache_vhost;;
-    [Nn]* ) exit ;;
-    * ) echo "Please answer yes or no.";;
-  esac
+  if [[ $DOMAIN_TYPE = 'standalone' ]]; then
+    read -p "Do you want to set up and install an Apache virtual hosts directive? [y/N]" yn
+    case $yn in
+      [Yy]* ) apache_vhost;;
+      [Nn]* ) exit ;;
+      * ) echo "Please answer yes or no.";;
+    esac
+  fi
 
   read -p "Do you want to set up the Sage Starter theme? [y/N]" yn
   case $yn in
@@ -509,9 +544,9 @@ EOF
 #
 # Trigger the functions in this script in the correct order.
 ################################################################################
-# setup_bedrock
-# setup_database
-# create_config
-# configure_database
-# options
 environment_and_path
+setup_bedrock
+setup_database
+create_config
+configure_database
+options
