@@ -1,28 +1,44 @@
 #!/bin/bash
 #
 # composer=/usr/local/bin/composer.phar
+#
 # This script:
 #
-# - Downloads and installs a Bedrock project to a directory you specify
-# -
+# - Sets up a directory and environment for your project
+# - Downloads and installs a Bedrock project to your new project directory
+# - Can be either a subdirectory of localhost (for dev) or a standalone URL (for production)
+# - Generates (pseudo) random salts internally without calling to the WP secret key generator
+# - Generates strong passwords for the database and the first WordPress admin user
+# - Creates a new project database
+# - Configures database for WordPress (using WP-CLI)
+# - Builds the Bedrock config (.env) with DB connection, environment etc.
+# - Optionally install & setup a new WP theme based on Sage (using Composer)
+# - Optionally install Sage Soil plugin (using Composer)
+# - Optionally create and enable an Apache virtual host configuration ('standalone' URL only)
+# - Optionally create a new GitHub repo for your project and make a first commit
 #
-# Notes re: MacOS
-# I don't think the tr command is available on Mac - this is used by this script
-# to generate passwords.
+# ## Requirements
+# - [Composer](https://getcomposer.org/), which should be referenced in your $PATH
+# - [WP-CLI](http://wp-cli.org/)
 ################################################################################
 
-# Set the Project directory
+################################################################################
+# Set the Project directory and include dependencies for this script.
+# Define some colours.
+#
+################################################################################
+
+# Set directory
 THIS=$(readlink -f ${BASH_SOURCE[0]})
 PROJECT_DIR=$(dirname $THIS)
 
 # Include dependencies
 . "$PROJECT_DIR/password-generation"
 
-echo -e "Directory is $PROJECT_DIR"
-
+# Define colours for readability
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
-LB='\033[1;34m'
+LB='\033[1;34m' # Light blue
 NC='\033[0m' # No Color
 
 ################################################################################
@@ -31,9 +47,9 @@ NC='\033[0m' # No Color
 ################################################################################
 function environment_and_path() {
   echo -e ${YELLOW}
-  echo -e "+-------------------------------------------------------------------+"
+
   echo -e "| Choose an environment for this project:                           |"
-  echo -e "+-------------------------------------------------------------------+"
+
   echo -e ${NC}
 
   PS3='Select the environment for this project by entering a number from the above list:'
@@ -62,16 +78,15 @@ function environment_and_path() {
   echo -e "${LB}$SITE_ENV${NC} selected"
 
   echo -e ${YELLOW}
-  echo -e "+-------------------------------------------------------------------+"
-  echo -e "| Do you want to install this project as a sub-directory of         |"
-  echo -e "| localhost (accessed at http://localhost/newsite/web), or as       |"
-  echo -e "| a standalone domain (accessed at http://newsite.com)?             |"
-  echo -e "| Selecting 'localhost' won't require adjusting '/etc/hosts'        |"
-  echo -e "| for local development. For a production environment, you'll       |"
-  echo -e "| need the 'standalone' option.                                     |"
-  echo -e "| NOTE: if you choose 'localhost' you won't get an option to set    |"
-  echo -e "| a virtual host for your project.                                  |"
-  echo -e "+-------------------------------------------------------------------+"
+  echo -e "Do you want to install this project as a sub-directory of"
+  echo -e "localhost (accessed at http://localhost/newsite/web), or as"
+  echo -e "a standalone domain (accessed at http://newsite.com)?"
+  echo -e ""
+  echo -e "Selecting 'localhost' won't require adjusting '/etc/hosts'"
+  echo -e "for local development. For a production environment, you'll"
+  echo -e "need the 'standalone' option."
+  echo -e "NOTE: if you choose 'localhost' you won't get an option to set"
+  echo -e "a virtual host for your project."
   echo -e ${NC}
 
   PS3='Select domain type for this project by entering a number from the list above:'
@@ -96,10 +111,8 @@ function environment_and_path() {
   if [[ $DOMAIN_TYPE == standalone ]]; then
 
     echo -e ${YELLOW}
-    echo -e "+-----------------------------------------------------------------+"
-    echo -e "| Set the root domain for this project.                           |"
-    echo -e "| IMPORTANT: use the format 'example.com':                        |"
-    echo -e "+-----------------------------------------------------------------+"
+    echo -e "Set the root domain for this project."
+    echo -e "IMPORTANT: use the format 'example.com':"
     echo -e ${NC}
 
     regex="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$"
@@ -128,6 +141,15 @@ function environment_and_path() {
 
   WP_DIR=/var/www/html/$SITE_NAME
 
+  # Open to search engines by default, but provide an option to discourage
+  SEARCH_ENGINES=1
+  read -p "Do you want to DISCOURAGE search engines? [y/N]" yn
+  case $yn in
+    [Yy]* ) SEARCH_ENGINES=0;;
+    [Nn]* ) ;;
+    * ) echo "Please answer yes or no.";;
+  esac
+
 }
 
 ################################################################################
@@ -138,11 +160,9 @@ function environment_and_path() {
 function setup_bedrock() {
 
   echo -e ${YELLOW}
-  echo -e "+-------------------------------------------------------------------+"
-  echo -e "| Sudo privilege will be used to create your new project directory. |"
-  echo -e "| Once created, the directory will be chown'd to your \$USER.       |"
-  echo -e "| Composer will then install Bedrock.                               |"
-  echo -e "+-------------------------------------------------------------------+"
+  echo -e "Sudo privilege will be used to create your new project directory."
+  echo -e "Once created, ownership of the directory will be given to $USER."
+  echo -e "Composer will then install Bedrock."
   echo -e ${NC}
   echo ""
 
@@ -164,10 +184,9 @@ function setup_bedrock() {
   cd $WP_DIR
 
   echo -e ${YELLOW}
-  echo -e "+-------------------------------------------------------------------+"
-  echo -e "| The new Bedrock site has been created at $WP_DIR.                 |"
-  echo -e "| It is owned by \"$USER\".                                         |"
-  echo -e "+-------------------------------------------------------------------+"
+
+  echo -e "| The new Bedrock project has been created.                         |"
+
   echo -e ${NC}
   echo ""
 
@@ -183,21 +202,18 @@ function setup_bedrock() {
 function setup_database() {
 
   echo -e ${YELLOW}
-  echo -e "+-------------------------------------------------------------------+"
-  echo -e "| This script will create a local database with a new user.         |"
-  echo -e "| You will be prompted to set new passwords, and you will need      |"
-  echo -e "| to enter your MySQL/MariaDB root password.                        |"
-  echo -e "+-------------------------------------------------------------------|"
+  echo -e "Create a local database with a new user."
+  echo -e "You will need to enter your MySQL/MariaDB root password."
   echo -e ${NC}
   echo -e ""
+
   echo -e "Enter the name of the new database:"
   read  DB_NAME
 
   DB_USER=$DB_NAME
   DB_USER+=_user
 
-  # echo -e "Enter a STRONG password for the new database:"
-  # read DB_PASS
+  # Set a strong alpha-numeric password for the DB
   DB_PASS=$(random_password 32 alnum)
 
   # For security purposes, ask for a table prefix. Default to 'wp_'
@@ -224,19 +240,15 @@ function setup_database() {
   then
 
     echo -e ${RED}
-    echo -e "+-----------------------------------------------------------------+"
-    echo -e "| [Error]: Database creation failed.                              |"
-    echo -e "+-----------------------------------------------------------------+"
+    echo -e "[ERROR]: Database creation failed."
     echo -e ${NC}
     exit 1
 
   else
 
     echo -e ${YELLOW}
-    echo -e "+-----------------------------------------------------------------+"
-    echo -e "| Successfully created database $DB_NAME. The database details    |"
-    echo -e "| will be added to your project's .env file.                      |"
-    echo -e "+-----------------------------------------------------------------+"
+    echo -e "Successfully created database $DB_NAME. The database details"
+    echo -e "will be added to your project's .env file."
     echo -e ${NC}
     echo -e ""
 
@@ -252,25 +264,22 @@ function setup_database() {
 function configure_database() {
 
   echo -e ${YELLOW}
-  echo -e "+-------------------------------------------------------------------+"
-  echo -e "| Configure the  new Database for WordPress.                        |"
-  echo -e "| A strong password will be automatically assigned for your admin   |"
-  echo -e "| user. You'll have access to this at the end of the config process.|"
-  echo -e "+-------------------------------------------------------------------+"
+  echo -e "Configure the  new Database for WordPress."
+  echo -e "A strong password will be automatically assigned for your admin"
+  echo -e "user. You'll have access to this at the end of the config process."
+  echo -e "Path: $WP_PATH"
   echo -e ${NC}
 
-  # Install WordPress
-  #echo -e "Enter a password for WordPress.\nYour database might be exported to a publicly accessible server, so please set a strong password."
-  #read WP_PASS
   WP_PASS=$(random_password)
 
   echo -e "Enter a username. NOT 'ADMIN'!"
   read WP_USERNAME
 
+  # Install WordPress
   wp core install --url=$WP_PATH --title="Basic Test Site" --admin_user=$WP_USERNAME --admin_password=$WP_PASS --admin_email=$EMAIL
 
   # Discourage search engines
-  wp option update blog_public 0
+  wp option update blog_public $SEARCH_ENGINES
 
   # delete sample page, and create homepage
   wp post delete $(wp post list --post_type=page --posts_per_page=1 --post_status=publish --pagename="sample-page" --field=ID --format=ids)
@@ -292,19 +301,16 @@ function configure_database() {
   wp rewrite flush --hard
 
   echo -e ${YELLOW}
-  echo -e "+-------------------------------------------------------------------+"
-  echo -e "| WordPress has been installed successfully.                        |"
-  echo -e "+-------------------------------------------------------------------+"
+  echo -e "WordPress has been installed successfully."
   echo -e ""
-  echo -e "+-------------------------------------------------------------------+"
   echo -e "DB Info:"
   echo -e "DB Name: $DB_NAME"
   echo -e "DB User: $DB_USER"
   echo -e "DB Pass: $DB_PASS"
-  echo -e "\nWordPress User details:"
+  echo -e ""
+  echo -e "WordPress User details:"
   echo -e "WP username: $WP_USERNAME"
   echo -e "WP password: $WP_PASS"
-  echo -e "+-------------------------------------------------------------------+"
   echo -e ${NC}
 
 }
@@ -312,7 +318,7 @@ function configure_database() {
 ################################################################################
 # Generate a .env file in the project root and populate the file with values.
 #
-# ##############################################################################
+################################################################################
 create_config() {
 
   touch $WP_DIR/.env
@@ -347,22 +353,33 @@ EOF
 setup_theme() {
 
   echo -e ${YELLOW}
-  echo -e "+-------------------------------------------------------------------+"
-  echo -e "| Choose a name for the new theme:                                  |"
-  echo -e "+-------------------------------------------------------------------+"
+  echo -e "Choose a name for the new theme:"
   echo -e ${NC}
   read THEMENAME
 
   composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME 9.0.0-alpha.1
 
   cd $WP_DIR/web/app/themes/$THEMENAME
-  replace "bedrock" "$THEMENAME" -- assets/config.json
 
   printf "Run NPM Install:\n"
   npm install
 
   printf "Run NPM Build:\n"
   npm run build
+
+  # Set the theme name in style.css to avoid confusion
+  #cp -r $WP_DIR/wp-content/themes/sage $WP_DIR/web/app/themes/$THEMENAME
+
+  # Change first line of style.css to avoid confusion
+  themeline="Theme Name:         $THEMENAME"
+  # awk NR variable corresponds to line number - targets the 'Theme Name:' line.
+  awk -v stylename="$themeline" '{ if (NR == 2) print stylename; else print $0}' $WP_DIR/web/app/themes/$THEMENAME/style.css > $WP_DIR/web/app/themes/$THEMENAME/stylemod.css
+  sudo cp $WP_DIR/web/app/themes/$THEMENAME/stylemod.css $WP_DIR/web/app/themes/$THEMENAME/style.css
+  rm $WP_DIR/web/app/themes/$THEMENAME/stylemod.css
+
+  echo -e ${YELLOW}
+  echo -e "The first line of style.css has been amended to reflect your theme\n name - don\'t forget to amend the rest of this file."
+  echo -e ${NC}
 
   printf "Activate Sage:\n"
   wp theme activate $THEMENAME
@@ -446,13 +463,13 @@ apache_vhost() {
   VHOST_NAME=$SITE_NAME.conf
   CONFIG=/etc/apache2/sites-available/$VHOST_NAME
 
-  echo -e "+--------------------------------------------------------------------+"
-  echo -e "| You have chosen to set up an Apache vhosts directive.              |"             |
-  echo -e "| This will involve creating and activating an Apache config file:   |"
-  echo -e "| /etc/apache2/sites-available/$SITE_NAME.conf.                      |"
-  echo -e "| This will require sudo privileges.                                 |"
-  echo -e "| For the moment this sets up a vhost for port 80(http protocol).    |"
-  echo -e "+--------------------------------------------------------------------+"
+  echo -e ${YELLOW}
+  echo -e "You have chosen to set up an Apache vhosts directive."
+  echo -e "This will involve creating and activating an Apache config file:"
+  echo -e "/etc/apache2/sites-available/$SITE_NAME.conf."
+  echo -e "This will require sudo privileges."
+  echo -e "This sets up a vhost for port 80(http protocol) only."
+  echo -e ${NC}
 
   sudo touch $CONFIG
 
@@ -460,7 +477,7 @@ apache_vhost() {
 <VirtualHost *:80>
         ServerName $SITE_NAME
         ServerAlias www.$SITE_NAME
-        ServerAdmin info@example.com
+        ServerAdmin $EMAIL
         DocumentRoot /var/www/html/$SITE_NAME/web
         <Directory /var/www/html/$SITE_NAME/web>
                 Options -Indexes +FollowSymLinks
@@ -474,14 +491,50 @@ apache_vhost() {
 EOF
 
   # See http://unix.stackexchange.com/a/19708
-  printf "%s" "$VHOST_DIRECTIVES" | sudo tee $CONFIG
+  # Works, but outputs to terminal which is messy:
+  # printf "%s" "$VHOST_DIRECTIVES" | sudo tee $CONFIG
+  sudo sh -c "printf '%s' '$VHOST_DIRECTIVES' > $CONFIG"
+
+  if [[ $? != "0" ]]; then
+
+    # A problem - Apache should output errors?
+    echo -e ${RED}
+    echo -e "There was a problem creating the Apache config file."
+    echo -e ${NC}
+
+  else
+
+    echo -e ${YELLOW}
+    echo -e "The VHost directives were written to $CONFIG."
+    echo -e ${NC}
+
+  fi
 
   # enable newly created virtualhost
+  echo -e ${LB}
   echo "Running a2ensite..."
+  echo -e ${NC}
   sudo a2ensite $VHOST_NAME
 
+  echo -e ${LB}
   echo "Restarting Apache..."
+  echo -e ${NC}
   sudo /etc/init.d/apache2 restart
+
+  if [[ $? != "0" ]]; then
+
+    # A problem - Apache should output errors?
+    echo -e ${RED}
+    echo -e "Apache Could not restart. Run 'disensite $VHOST_NAME' and restart Apache to revert."
+    echo -e ${NC}
+
+  else
+
+    echo -e ${YELLOW}
+    echo -e "Apache restarted successfully.\nTo see your site, DNS needs to be set up."
+    echo -e ${NC}
+
+  fi
 
 }
 
@@ -498,7 +551,7 @@ function options() {
   read -p "Do you want to install and activate the Roots \"Soil\" plugin? [y/N]" yn
   case $yn in
     [Yy]* ) install_soil;;
-    [Nn]* ) exit ;;
+    [Nn]* ) echo "Soil not installed.";;
     * ) echo "Please answer yes or no.";;
   esac
 
@@ -506,7 +559,7 @@ function options() {
     read -p "Do you want to set up and install an Apache virtual hosts directive? [y/N]" yn
     case $yn in
       [Yy]* ) apache_vhost;;
-      [Nn]* ) exit ;;
+      [Nn]* ) echo "No Apache VHost setup.";;
       * ) echo "Please answer yes or no.";;
     esac
   fi
@@ -514,7 +567,7 @@ function options() {
   read -p "Do you want to set up the Sage Starter theme? [y/N]" yn
   case $yn in
     [Yy]* ) setup_theme;;
-    [Nn]* ) exit ;;
+    [Nn]* ) echo "Sage theme was not installed.";;
     * ) echo "Please answer yes or no.";;
   esac
 
