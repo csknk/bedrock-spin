@@ -47,9 +47,7 @@ NC='\033[0m' # No Color
 ################################################################################
 function environment_and_path() {
   echo -e ${YELLOW}
-
-  echo -e "| Choose an environment for this project:                           |"
-
+  echo -e "Choose an environment for this project:"
   echo -e ${NC}
 
   PS3='Select the environment for this project by entering a number from the above list:'
@@ -181,12 +179,18 @@ function setup_bedrock() {
   find /var/www/html/$SITE_NAME -type d -exec chmod 755 {} \;
   find /var/www/html/$SITE_NAME -type f -exec chmod 644 {} \;
 
+  # Set up an empty .htaccess with proper permissions. This allows WP to build
+  # re-write rules. If this isn't done, `http://example.com/wp-admin` won't
+  # redirect to `http://example.com/wp/wp-admin`.
   cd $WP_DIR
+  touch .htaccess
+  chown .htaccess www-data
+
+  # Allow server write access to uploads directory.
+  chown -R www-data:$USER $WP_DIR/web/app/uploads
 
   echo -e ${YELLOW}
-
-  echo -e "| The new Bedrock project has been created.                         |"
-
+  echo -e "The new Bedrock project has been created."
   echo -e ${NC}
   echo ""
 
