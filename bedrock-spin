@@ -361,7 +361,21 @@ setup_theme() {
   echo -e ${NC}
   read THEMENAME
 
-  composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME 9.0.0-alpha.1
+  # Select Sage version --------------------------------------------------------
+  echo -e "If required, enter a release. Defaults to dev-master branch."
+  read SAGE_BRANCH
+
+  if [ "SAGE_BRANCH" = "" ]; then
+
+    composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME dev-master
+
+  else
+
+    composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME $SAGE_BRANCH
+
+  fi
+
+  # ----------------------------------------------------------------------------
 
   cd $WP_DIR/web/app/themes/$THEMENAME
 
