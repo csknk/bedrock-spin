@@ -55,15 +55,12 @@ function environment_and_path() {
   do
     case "$SITE_ENV" in
       "development")
-          #echo "$SITE_ENV selected"
           break
           ;;
       "staging")
-          #echo "$SITE_ENV selected"
           break
           ;;
       "production")
-          #echo "$SITE_ENV selected"
           break
           ;;
       "Quit")
@@ -172,7 +169,7 @@ function setup_bedrock() {
   # Set ownership for directory
   sudo chown -R $USER:www-data $WP_DIR
 
-  # Create new directory and use WP-CLI to download WordPress
+  # Create new directory and use Composer to download Bedrock
   composer create-project roots/bedrock $WP_DIR
 
   # Set directory & file permissions using an absolute path:
@@ -182,12 +179,12 @@ function setup_bedrock() {
   # Set up an empty .htaccess with proper permissions. This allows WP to build
   # re-write rules. If this isn't done, `http://example.com/wp-admin` won't
   # redirect to `http://example.com/wp/wp-admin`.
-  cd $WP_DIR
+  cd $WP_DIR/web
   touch .htaccess
-  chown .htaccess www-data
+  sudo chown www-data .htaccess
 
   # Allow server write access to uploads directory.
-  chown -R www-data:$USER $WP_DIR/web/app/uploads
+  sudo chown -R www-data:$USER $WP_DIR/web/app/uploads
 
   echo -e ${YELLOW}
   echo -e "The new Bedrock project has been created."
@@ -362,12 +359,12 @@ setup_theme() {
   read THEMENAME
 
   # Select Sage version --------------------------------------------------------
-  echo -e "If required, enter a release. Defaults to dev-master branch."
+  echo -e "If required, enter a release. Defaults to master branch."
   read SAGE_BRANCH
 
   if [ "SAGE_BRANCH" = "" ]; then
 
-    composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME dev-master
+    composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME master
 
   else
 
