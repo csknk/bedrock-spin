@@ -277,7 +277,7 @@ function configure_database() {
   echo -e "Path: $WP_PATH"
   echo -e ${NC}
 
-  WP_PASS=$(random_password)
+  WP_PASS=$(random_password 32 print)
 
   echo -e "Enter a username. NOT 'ADMIN'!"
   read WP_USERNAME
@@ -370,7 +370,7 @@ setup_theme() {
 
   if [ "SAGE_BRANCH" = "" ]; then
 
-    composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME master
+    composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME dev-master
 
   else
 
@@ -382,11 +382,34 @@ setup_theme() {
 
   cd $WP_DIR/web/app/themes/$THEMENAME
 
-  printf "Run NPM Install:\n"
-  npm install
+  PS3='Install Node Modules using Yarn or NPM?'
+    NODE_OPTIONS=("yarn" "npm" "Quit")
+    select NODE_OPTION in "${NODE_OPTIONS[@]}";
+    do
+        case "$NODE_OPTION" in
+            "yarn")
+            yarn install
+            yarn build
+            break
+            ;;
+            "npm")
+            npm install
+            npm run build
+            break
+            ;;
+            "Quit")
+            break
+            ;;
+            *) echo invalid option;;
+        esac
 
-  printf "Run NPM Build:\n"
-  npm run build
+    done
+
+  # printf "Run NPM Install:\n"
+  # npm install
+  #
+  # printf "Run NPM Build:\n"
+  # npm run build
 
   # Set the theme name in style.css to avoid confusion
   #cp -r $WP_DIR/wp-content/themes/sage $WP_DIR/web/app/themes/$THEMENAME
