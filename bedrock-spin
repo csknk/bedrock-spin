@@ -277,13 +277,14 @@ function configure_database() {
   echo -e "Path: $WP_PATH"
   echo -e ${NC}
 
+  # Create a 'random' 32 character password using printable posix characters.
   WP_PASS=$(random_password 32 print)
 
   echo -e "Enter a username. NOT 'ADMIN'!"
   read WP_USERNAME
 
   # Install WordPress
-  wp core install --url=$WP_PATH --title="Basic Test Site" --admin_user=$WP_USERNAME --admin_password=$WP_PASS --admin_email=$EMAIL
+  wp core install --url=$WP_PATH --title="Basic Test Site" --admin_user=$WP_USERNAME --admin_password="${WP_PASS}" --admin_email=$EMAIL
 
   # Discourage search engines
   wp option update blog_public $SEARCH_ENGINES
