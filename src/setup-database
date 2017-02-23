@@ -1,0 +1,63 @@
+#!/bin/bash
+################################################################################
+# Build new database.
+# Username is based on the chosen database name. For shared hosting environments,
+# should this be more secure? Probably not relevant in a VPS context.
+################################################################################
+
+function setup_database() {
+
+    echo -e ${YELLOW}
+    echo -e "Create a local database with a new user."
+    echo -e "You will need to enter your MySQL/MariaDB root password."
+    echo -e ${NC}
+    echo -e ""
+
+    echo -e "Enter the name of the new database:"
+    read  DB_NAME
+
+    DB_USER=$DB_NAME
+    DB_USER+=_user
+
+    # Set a strong alpha-numeric password for the DB
+    DB_PASS=$(random_password 32 alnum)
+
+    # For security purposes, ask for a table prefix. Default to 'wp_'
+    echo -e "If required, enter a database table prefix. Leave out the underscore. Defaults to 'wp_'."
+    read DB_PREFIX
+
+    if [ "$DB_PREFIX" = "" ]; then
+        DB_PREFIX=wp_
+
+    else
+        DB_PREFIX=${DB_PREFIX}_
+    fi
+
+    echo "Prefix: $DB_PREFIX"
+
+    echo -e "Enter the MySQL/MariaDB root password:"
+    read -s ROOT_PASSWORD
+
+    DB_ARGS="CREATE DATABASE $DB_NAME;GRANT ALL PRIVILEGES ON $DB_NAME.* TO $DB_USER@localhost IDENTIFIED BY '$DB_PASS';FLUSH PRIVILEGES;"
+    mysql -u root -p$ROOT_PASSWORD -e "$DB_ARGS"
+
+    if [ $? != "0" ]
+
+    then
+
+        echo -e ${RED}
+        echo -e "[ERROR]: Database creation failed."
+        echo -e ${NC}
+        exit 1
+
+    else
+
+        echo -e ${YELLOW}
+        echo -e "Successfully created database $DB_NAME. The database details"
+        echo -e "will be added to your project's .env file."
+        echo -e ${NC}
+        echo -e ""
+
+    fi
+
+}

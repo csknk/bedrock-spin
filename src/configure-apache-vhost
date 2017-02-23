@@ -1,0 +1,84 @@
+#!/bin/bash
+################################################################################
+# Configure and enable an Apache vhost directive
+#
+################################################################################
+apache_vhost() {
+
+    VHOST_NAME=$SITE_NAME.conf
+    CONFIG=/etc/apache2/sites-available/$VHOST_NAME
+
+    echo -e ${YELLOW}
+    echo -e "You have chosen to set up an Apache vhosts directive."
+    echo -e "This will involve creating and activating an Apache config file:"
+    echo -e "/etc/apache2/sites-available/$SITE_NAME.conf."
+    echo -e "This will require sudo privileges."
+    echo -e "This sets up a vhost for port 80(http protocol) only."
+    echo -e ${NC}
+
+    sudo touch $CONFIG
+
+    read -r -d '' VHOST_DIRECTIVES << EOF
+    <VirtualHost *:80>
+    ServerName $SITE_NAME
+    ServerAlias www.$SITE_NAME
+    ServerAdmin $EMAIL
+    DocumentRoot /var/www/html/$SITE_NAME/web
+    <Directory /var/www/html/$SITE_NAME/web>
+    Options -Indexes +FollowSymLinks
+    AllowOverride All
+    Require all granted
+    </Directory>
+    ErrorLog \${APACHE_LOG_DIR}/$SITE_NAME.error.log
+    CustomLog \${APACHE_LOG_DIR}/$SITE_NAME.access.log combined
+    </VirtualHost>
+
+EOF
+
+    # See http://unix.stackexchange.com/a/19708
+    # Works, but outputs to terminal which is messy:
+    # printf "%s" "$VHOST_DIRECTIVES" | sudo tee $CONFIG
+    sudo sh -c "printf '%s' '$VHOST_DIRECTIVES' > $CONFIG"
+
+    if [[ $? != "0" ]]; then
+
+        # A problem - Apache should output errors?
+        echo -e ${RED}
+        echo -e "There was a problem creating the Apache config file."
+        echo -e ${NC}
+
+    else
+
+        echo -e ${YELLOW}
+        echo -e "The VHost directives were written to $CONFIG."
+        echo -e ${NC}
+
+    fi
+
+    # enable newly created virtualhost
+    echo -e ${LB}
+    echo "Running a2ensite..."
+    echo -e ${NC}
+    sudo a2ensite $VHOST_NAME
+
+    echo -e ${LB}
+    echo "Restarting Apache..."
+    echo -e ${NC}
+    sudo /etc/init.d/apache2 restart
+
+    if [[ $? != "0" ]]; then
+
+        # A problem - Apache should output errors?
+        echo -e ${RED}
+        echo -e "ERROR! Apache Could not restart. Run 'sudo a2dissite $VHOST_NAME' and restart Apache `sudo service apache2 restart` to revert."
+        echo -e ${NC}
+
+    else
+
+        echo -e ${YELLOW}
+        echo -e "Apache restarted successfully.\nTo see your site, DNS needs to be set up."
+        echo -e ${NC}
+
+    fi
+
+}

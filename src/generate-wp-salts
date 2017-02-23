@@ -1,0 +1,19 @@
+#!/bin/bash
+# Generate WordPress Salts
+function generate_salts() {
+
+    IFS=; read -r -d '' SALTS << EOF
+
+    AUTH_KEY=$(random_salt)
+    SECURE_AUTH_KEY=$(random_salt)
+    LOGGED_IN_KEY=$(random_salt)
+    NONCE_KEY=$(random_salt)
+    AUTH_SALT=$(random_salt)
+    SECURE_AUTH_SALT=$(random_salt)
+    LOGGED_IN_SALT=$(random_salt)
+    NONCE_SALT=$(random_salt)
+EOF
+
+    echo $SALTS
+
+}

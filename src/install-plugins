@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Install roots/soil
+function install_soil() {
+    composer require roots/soil 3.7.1
+    wp plugin activate soil
+}

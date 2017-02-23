@@ -1,0 +1,48 @@
+#!/bin/bash
+################################################################################
+# Set up Bedrock using Composer.
+# Composer needs to be in your $PATH.
+################################################################################
+function setup_bedrock() {
+
+    echo -e ${YELLOW}
+    echo -e "Sudo privilege will be used to create your new project directory."
+    echo -e "Once created, ownership of the directory will be given to $USER."
+    echo -e "Composer will then install Bedrock."
+    echo -e ${NC}
+    echo ""
+
+    sudo mkdir $WP_DIR
+
+    echo -e "Please enter the admin email address for this project. Enter blank to default to your git user email:"
+    read EMAIL
+    if [ "$EMAIL" = "" ]; then
+        EMAIL=$(git config --get user.email)
+    fi
+
+    # Set ownership for directory
+    sudo chown -R $USER:www-data $WP_DIR
+
+    # Create new directory and use Composer to download Bedrock
+    composer create-project roots/bedrock $WP_DIR
+
+    # Set directory & file permissions using an absolute path:
+    find /var/www/html/$SITE_NAME -type d -exec chmod 755 {} \;
+    find /var/www/html/$SITE_NAME -type f -exec chmod 644 {} \;
+
+    # Set up an empty .htaccess with proper permissions. This allows WP to build
+    # re-write rules. If this isn't done, `http://example.com/wp-admin` won't
+    # redirect to `http://example.com/wp/wp-admin`.
+    cd $WP_DIR/web
+    touch .htaccess
+    sudo chown www-data .htaccess
+
+    # Allow server write access to uploads directory.
+    sudo chown -R www-data:$USER $WP_DIR/web/app/uploads
+
+    echo -e ${YELLOW}
+    echo -e "The new Bedrock project has been created."
+    echo -e ${NC}
+    echo ""
+
+}

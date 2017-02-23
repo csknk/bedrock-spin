@@ -1,0 +1,58 @@
+#!/bin/bash
+# Set up wp-config.php.
+# Requires WP-CLI
+################################################################################
+function configure_database() {
+
+    echo -e ${YELLOW}
+    echo -e "Configure the  new Database for WordPress."
+    echo -e "A strong password will be automatically assigned for your admin"
+    echo -e "user. You'll have access to this at the end of the config process."
+    echo -e "Path: $WP_PATH"
+    echo -e ${NC}
+
+    # Create a 'random' 32 character password using printable posix characters.
+    WP_PASS=$(random_password 32 print)
+
+    echo -e "Enter a username. NOT 'ADMIN'!"
+    read WP_USERNAME
+
+    # Install WordPress
+    wp core install --url=$WP_PATH --title="Basic Test Site" --admin_user=$WP_USERNAME --admin_password="${WP_PASS}" --admin_email=$EMAIL
+
+    # Discourage search engines
+    wp option update blog_public $SEARCH_ENGINES
+
+    # delete sample page, and create homepage
+    wp post delete $(wp post list --post_type=page --posts_per_page=1 --post_status=publish --pagename="sample-page" --field=ID --format=ids)
+    wp post create --post_type=page --post_title=Home --post_status=publish --post_author=$(wp user get $WP_USERNAME --field=ID --format=ids)
+    wp post create --post_type=page --post_title=About --post_status=publish --post_author=$(wp user get $WP_USERNAME --field=ID --format=ids)
+
+    # delete readme and license
+    rm license.txt
+    rm readme.html
+
+    # set homepage as front page
+    wp option update show_on_front 'page'
+
+    # set homepage to be the new page
+    wp option update page_on_front $(wp post list --post_type=page --post_status=publish --posts_per_page=1 --pagename=home --field=ID --format=ids)
+
+    # set pretty urls
+    wp rewrite structure '/%postname%/' --hard
+    wp rewrite flush --hard
+
+    echo -e ${YELLOW}
+    echo -e "WordPress has been installed successfully."
+    echo -e ""
+    echo -e "DB Info:"
+    echo -e "DB Name: $DB_NAME"
+    echo -e "DB User: $DB_USER"
+    echo -e "DB Pass: $DB_PASS"
+    echo -e ""
+    echo -e "WordPress User details:"
+    echo -e "WP username: $WP_USERNAME"
+    echo -e "WP password: $WP_PASS"
+    echo -e ${NC}
+
+}

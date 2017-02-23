@@ -1,0 +1,73 @@
+#!/bin/bash
+# Setup Sage starter theme.
+################################################################################
+setup_theme() {
+
+    echo -e ${YELLOW}
+    echo -e "Choose a name for the new theme:"
+    echo -e ${NC}
+    read THEMENAME
+
+    # Select Sage version
+    echo -e "If required, enter a release. Defaults to master branch."
+    read SAGE_BRANCH
+
+    if [ "SAGE_BRANCH" = "" ]; then
+        composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME dev-master
+    else
+        composer create-project roots/sage $WP_DIR/web/app/themes/$THEMENAME $SAGE_BRANCH
+    fi
+
+    cd $WP_DIR/web/app/themes/$THEMENAME
+    PS3='Install Node Modules using Yarn or NPM?'
+    NODE_OPTIONS=("yarn" "npm" "Quit")
+    select NODE_OPTION in "${NODE_OPTIONS[@]}";
+    do
+        case "$NODE_OPTION" in
+            "yarn")
+            yarn install
+            yarn build
+            break
+            ;;
+            "npm")
+            npm install
+            npm run build
+            break
+            ;;
+            "Quit")
+            break
+            ;;
+            *) echo invalid option;;
+        esac
+
+    done
+
+    # Change first line of style.css to avoid confusion
+    themeline="Theme Name:         $THEMENAME"
+    # awk NR variable corresponds to line number - targets the 'Theme Name:' line.
+    awk -v stylename="$themeline" '{ if (NR == 2) print stylename; else print $0}' $WP_DIR/web/app/themes/$THEMENAME/style.css > $WP_DIR/web/app/themes/$THEMENAME/stylemod.css
+    sudo cp $WP_DIR/web/app/themes/$THEMENAME/stylemod.css $WP_DIR/web/app/themes/$THEMENAME/style.css
+    rm $WP_DIR/web/app/themes/$THEMENAME/stylemod.css
+
+    echo -e ${YELLOW}
+    echo -e "The first line of style.css has been amended to reflect your theme\n name - don\'t forget to amend the rest of this file."
+    echo -e ${NC}
+
+    printf "Activate Sage:\n"
+    wp theme activate $THEMENAME
+
+    read -p "Set up a new GitHub repo for $THEMENAME? [y/N]" yn
+    case $yn in
+        [Yy]* ) setup_repo;;
+        [Nn]* ) ;;
+        * ) echo "Please answer yes or no.";;
+    esac
+
+    read -p "Do you want to open this project in Atom? [y/N]" yn
+    case $yn in
+        [Yy]* ) atom .;;
+        [Nn]* ) exit ;;
+        * ) echo "Please answer yes or no.";;
+    esac
+
+}
