@@ -8,24 +8,21 @@ create_config() {
     touch $WP_DIR/.env
 
     read -r -d '' CONFIG_ARGS << EOF
-    DB_NAME=$DB_NAME
-    DB_USER=$DB_USER
-    DB_PASSWORD=$DB_PASS
-    DB_HOST=localhost
-    DB_PREFIX=$DB_PREFIX
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASS
+DB_HOST=localhost
+DB_PREFIX=$DB_PREFIX
 
-    WP_ENV=$SITE_ENV
-    WP_HOME=$WP_PATH
-    WP_SITEURL=$WP_PATH/wp
+WP_ENV=$SITE_ENV
+WP_HOME=$WP_PATH
+WP_SITEURL=$WP_PATH/wp
 
 EOF
 
     SALTS=$(generate_salts)
-
     COMBINED_CONFIG=${CONFIG_ARGS}$'\n'${SALTS}
-
     printf "%s" "$COMBINED_CONFIG" > $WP_DIR/.env
-
     cd $WP_DIR
 
 }

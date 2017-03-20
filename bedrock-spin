@@ -21,7 +21,10 @@
 # - [Composer](https://getcomposer.org/), which should be referenced in your $PATH
 # - [WP-CLI](http://wp-cli.org/)
 # ------------------------------------------------------------------------------
+
 # Set the Project directory and include dependencies for this script.
+# See https://www.cyberciti.biz/faq/bash-loop-over-file/
+# ------------------------------------------------------------------------------
 THIS=$(readlink -f ${BASH_SOURCE[0]})
 PROJECT_DIR=$(dirname $THIS)
 for FILENAME in $PROJECT_DIR/src/*; do
@@ -59,7 +62,7 @@ function options() {
 
 }
 
-# Run the functions in this script in the correct order.
+# Run the functions in the correct order.
 #-------------------------------------------------------------------------------
 environment_and_path
 setup_bedrock
