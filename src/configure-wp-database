@@ -3,7 +3,6 @@
 # Requires WP-CLI
 ################################################################################
 function configure_database() {
-
     echo -e ${YELLOW}
     echo -e "Configure the  new Database for WordPress."
     echo -e "A strong password will be automatically assigned for your admin"
@@ -12,8 +11,7 @@ function configure_database() {
     echo -e ${NC}
 
     # Create a 'random' 32 character password using printable posix characters.
-    WP_PASS=$(random_password 32 print)
-
+    WP_PASS=$(random_password 32 alnum)
     echo -e "Enter a username. NOT 'ADMIN'!"
     read WP_USERNAME
 
@@ -23,10 +21,11 @@ function configure_database() {
     # Discourage search engines
     wp option update blog_public $SEARCH_ENGINES
 
-    # delete sample page, and create homepage
-    wp post delete $(wp post list --post_type=page --posts_per_page=1 --post_status=publish --pagename="sample-page" --field=ID --format=ids)
-    wp post create --post_type=page --post_title=Home --post_status=publish --post_author=$(wp user get $WP_USERNAME --field=ID --format=ids)
-    wp post create --post_type=page --post_title=About --post_status=publish --post_author=$(wp user get $WP_USERNAME --field=ID --format=ids)
+    # delete all pages, and create homepage, about page, contact page
+    wp post delete $(wp post list --post_type='page' --format=ids)
+    wp post create --post_type=page --post_title=Home --post_status=publish --post_author=$(wp user get $WP_USERNAME --field=ID)
+    wp post create --post_type=page --post_title=About --post_status=publish --post_author=$(wp user get $WP_USERNAME --field=ID)
+    wp post create --post_type=page --post_title=Contact --post_status=publish --post_author=$(wp user get $WP_USERNAME --field=ID)
 
     # delete readme and license
     rm license.txt
@@ -54,5 +53,4 @@ function configure_database() {
     echo -e "WP username: $WP_USERNAME"
     echo -e "WP password: $WP_PASS"
     echo -e ${NC}
-
 }
