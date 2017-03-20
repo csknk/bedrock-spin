@@ -4,9 +4,7 @@
 #
 ################################################################################
 create_config() {
-
     touch $WP_DIR/.env
-
     read -r -d '' CONFIG_ARGS << EOF
 DB_NAME=$DB_NAME
 DB_USER=$DB_USER
@@ -24,5 +22,4 @@ EOF
     COMBINED_CONFIG=${CONFIG_ARGS}$'\n'${SALTS}
     printf "%s" "$COMBINED_CONFIG" > $WP_DIR/.env
     cd $WP_DIR
-
 }

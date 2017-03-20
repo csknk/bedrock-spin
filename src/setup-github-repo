@@ -2,9 +2,7 @@
 # Set up a GitHub Repo
 ################################################################################
 function setup_repo () {
-
     cd $WP_DIR/web/app/themes/$THEMENAME
-
     # remove existing git repo
     sudo rm -rf $WP_DIR/wp-content/themes/$THEMENAME/.git
     git init
@@ -40,7 +38,6 @@ function setup_repo () {
     echo -n "  Creating Github repository '$repo_name' ..."
     curl -u "$GIT_USERNAME:$token" https://api.github.com/user/repos -d '{"name":"'$repo_name'"}' > /dev/null 2>&1
     echo " done."
-
     echo -n "  Pushing local code to remote ..."
     git remote add origin git@github.com:$GIT_USERNAME/$repo_name.git > /dev/null 2>&1
     git push -u origin master > /dev/null 2>&1
@@ -48,5 +45,4 @@ function setup_repo () {
     git commit -m "First Commit"
     git push origin master
     echo " done."
-
 }

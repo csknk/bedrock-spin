@@ -99,6 +99,5 @@ function environment_and_path() {
         [Yy]* ) SEARCH_ENGINES=0;;
         [Nn]* ) ;;
         * ) echo "Please answer yes or no.";;
-    esac
-    
+    esac    
 }

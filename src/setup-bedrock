@@ -44,5 +44,4 @@ function setup_bedrock() {
     echo -e "The new Bedrock project has been created."
     echo -e ${NC}
     echo ""
-
 }
