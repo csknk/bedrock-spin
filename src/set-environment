@@ -66,25 +66,21 @@ function environment_and_path() {
         echo -e "IMPORTANT: use the format 'example.com':"
         echo -e ${NC}
 
-        regex="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$"
+        #regex="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$"
+        # Allow example.com/subdir - useful for staging sites
+        regex="^([a-z0-9]+(-[a-z0-9]+)*\.)+([a-z]{2,})+(\/[a-z0-9]*){0,}$"
 
         SITE_NAME=""
         while [[ ! $SITE_NAME =~ $regex ]]; do
-
             echo "Enter a root domain in the format 'example.com':"
             read SITE_NAME
-
         done
-
         WP_PATH=http://$SITE_NAME
-
     else
         # This option won't require adjusting `/etc/hosts` for local development work.
         echo -e "Please enter the root directory (a sub-directory of localhost) for the new site:"
         read SITE_NAME
-
         WP_PATH=http://localhost/$SITE_NAME/web
-
     fi
 
     echo "SITE_NAME is $SITE_NAME."
@@ -99,5 +95,5 @@ function environment_and_path() {
         [Yy]* ) SEARCH_ENGINES=0;;
         [Nn]* ) ;;
         * ) echo "Please answer yes or no.";;
-    esac    
+    esac
 }
