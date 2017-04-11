@@ -60,12 +60,10 @@ function environment_and_path() {
     done
 
     if [[ $DOMAIN_TYPE == standalone ]]; then
-
         echo -e ${YELLOW}
         echo -e "Set the root domain for this project."
-        echo -e "IMPORTANT: use the format 'example.com':"
+        echo -e "IMPORTANT: use the format 'example.com' or 'example.com/.subdirectory':"
         echo -e ${NC}
-
         #regex="^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$"
         # Allow example.com/subdir - useful for staging sites
         regex="^([a-z0-9]+(-[a-z0-9]+)*\.)+([a-z]{2,})+(\/[a-z0-9]*){0,}$"
