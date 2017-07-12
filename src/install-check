@@ -1,0 +1,8 @@
+#!/bin/bash
+################################################################################
+# Check to see if parent program for command is installed.
+################################################################################
+function program_exists()
+{
+  command -v "$1" >/dev/null 2>&1
+}

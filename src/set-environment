@@ -6,12 +6,12 @@ function environment_and_path() {
 
     # Check that WP-CLI and Composer are installed
     #---------------------------------------------------------------------------
-    if ! WP_CHECK="$(type -p "wp")" || [ -z "$WP_CHECK" ]; then
+    if ! program_exists wp; then
       echo WP-CLI is not installed. Visit: http://wp-cli.org/
       exit
     fi
 
-    if ! COMPOSER_CHECK="$(type -p "composer")" || [ -z "$COMPOSER_CHECK" ]; then
+    if ! program_exists composer; then
       echo Composer is not installed. Visit: https://getcomposer.org/
       exit
     fi
