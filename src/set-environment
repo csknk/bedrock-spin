@@ -3,6 +3,19 @@
 # Set the environment, URL, path and other important variables
 ################################################################################
 function environment_and_path() {
+
+    # Check that WP-CLI and Composer are installed
+    #---------------------------------------------------------------------------
+    if ! program_exists wp; then
+      echo WP-CLI is not installed. Visit: http://wp-cli.org/
+      exit
+    fi
+
+    if ! program_exists composer; then
+      echo Composer is not installed. Visit: https://getcomposer.org/
+      exit
+    fi
+
     echo -e ${YELLOW}
     echo -e "Choose an environment for this project:"
     echo -e ${NC}
